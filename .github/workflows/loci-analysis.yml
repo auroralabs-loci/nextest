@@ -14,6 +14,9 @@ jobs:
       LOCI_PROJECT: "nextest"
       LOCI_API_KEY: '${{ secrets.LOCI_API_KEY }}'
       LOCI_BACKEND_URL: '${{ vars.LOCI_BACKEND_URL }}'
+      CC_aarch64_unknown_linux_gnu: "aarch64-linux-gnu-gcc"
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: "aarch64-linux-gnu-gcc"
+      RUSTFLAGS: "-C debuginfo=2"
 
     environment: ${{ vars.LOCI_ENV || 'PROD__AL_DEMO' }}
 
@@ -28,7 +31,7 @@ jobs:
         shell: bash -euo pipefail {0}
 
       - name: Build
-        run: RUSTFLAGS="-C debuginfo=2" cargo build --target aarch64-unknown-linux-gnu --release
+        run: cargo build --target aarch64-unknown-linux-gnu --release
         shell: bash -euo pipefail {0}
 
       - name: Upload
