@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        run: sudo apt install gcc-aarch64-linux-gnu
+        run: sudo apt install gcc-aarch64-linux-gnu && rustup target add aarch64-unknown-linux-gnu
         shell: bash -euo pipefail {0}
 
       - name: Build
