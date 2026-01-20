@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      LOCI_PROJECT: PROJECT_NAME
+      LOCI_PROJECT: "nextest"
       LOCI_API_KEY: '${{ secrets.LOCI_API_KEY }}'
       LOCI_BACKEND_URL: '${{ vars.LOCI_BACKEND_URL }}'
 
@@ -24,11 +24,11 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        run: echo "Installing dependencies here"
+        run: sudo apt install gcc-aarch64-linux-gnu
         shell: bash -euo pipefail {0}
 
       - name: Build
-        run: echo "Building the project here"
+        run: RUSTFLAGS="-C debuginfo=2" cargo build --target aarch64-unknown-linux-gnu --release
         shell: bash -euo pipefail {0}
 
       - name: Upload
@@ -36,6 +36,13 @@ jobs:
         with:
           mode: upload
           binaries: |
-                path/to/your/binary1
-                path/to/your/binary2
+                target/aarch64-unknown-linux-gnu/release/build-seed-archive
+                target/aarch64-unknown-linux-gnu/release/cargo-nextest
+                target/aarch64-unknown-linux-gnu/release/fake-interceptor
+                target/aarch64-unknown-linux-gnu/release/grab-foreground
+                target/aarch64-unknown-linux-gnu/release/internal-test
+                target/aarch64-unknown-linux-gnu/release/large-alloc
+                target/aarch64-unknown-linux-gnu/release/passthrough
+                target/aarch64-unknown-linux-gnu/release/rustc-shim
+                target/aarch64-unknown-linux-gnu/release/zstd-dict
           project: '${{ env.LOCI_PROJECT }}'
