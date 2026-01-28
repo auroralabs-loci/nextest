@@ -1,4 +1,4 @@
-name: LOCI Analysis
+name: LOCI Analysis 
 on:
   push:
     branches:
