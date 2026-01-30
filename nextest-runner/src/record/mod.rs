@@ -28,6 +28,7 @@ mod cache_dir;
 pub mod dicts;
 mod display;
 pub mod format;
+mod portable;
 mod reader;
 mod recorder;
 pub mod replay;
@@ -47,6 +48,7 @@ pub use display::{
     DisplayRunList, RunListAlignment, Styles,
 };
 pub use format::RunsJsonWritePermission;
+pub use portable::{PortableArchiveResult, PortableArchiveWriter};
 pub use reader::{RecordEventIter, RecordReader};
 pub use recorder::{RunRecorder, StoreSizes};
 pub use replay::{

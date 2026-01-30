@@ -119,7 +119,7 @@ impl RecordedRunList {
     }
 }
 
-/// Metadata about a recorded run (serialization format for runs.json.zst).
+/// Metadata about a recorded run (serialization format for runs.json.zst and portable archives).
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) struct RecordedRun {
@@ -509,6 +509,41 @@ pub(super) static RECORD_OPTS_JSON_PATH: &str = "meta/record-opts.json";
 pub(super) static RERUN_INFO_JSON_PATH: &str = "meta/rerun-info.json";
 pub(super) static STDOUT_DICT_PATH: &str = "meta/stdout.dict";
 pub(super) static STDERR_DICT_PATH: &str = "meta/stderr.dict";
+
+// ---
+// Portable archive format types
+// ---
+
+/// The current format version for portable archives.
+///
+/// Increment this when making breaking changes to the portable archive structure.
+pub const PORTABLE_ARCHIVE_FORMAT_VERSION: u32 = 1;
+
+/// File name for the manifest in a portable archive.
+pub(super) static PORTABLE_MANIFEST_FILE_NAME: &str = "manifest.json";
+
+/// The manifest for a portable archive.
+///
+/// A portable archive packages a single recorded run into a self-contained
+/// zip file for sharing and import.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) struct PortableManifest {
+    /// The format version of this portable archive.
+    pub(super) format_version: u32,
+    /// The run metadata.
+    pub(super) run: RecordedRun,
+}
+
+impl PortableManifest {
+    /// Creates a new manifest for the given run.
+    pub(super) fn new(run: &RecordedRunInfo) -> Self {
+        Self {
+            format_version: PORTABLE_ARCHIVE_FORMAT_VERSION,
+            run: RecordedRun::from(run),
+        }
+    }
+}
 
 /// Which dictionary to use for compressing/decompressing a file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
