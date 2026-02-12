@@ -17,7 +17,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo release
-        uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        uses: taiki-e/install-action@d4422f254e595ee762a758628fe4f16ce050fa2e # v2
         with:
           tool: cargo-release@0.25.0
       - uses: taiki-e/create-gh-release-action@56a8b3f8449593aa02b91f7b84da564f476e94f0 # v1
@@ -42,7 +42,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo release
-        uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        uses: taiki-e/install-action@d4422f254e595ee762a758628fe4f16ce050fa2e # v2
         with:
           tool: cargo-release@0.25.0
       - uses: taiki-e/create-gh-release-action@56a8b3f8449593aa02b91f7b84da564f476e94f0 # v1
@@ -67,7 +67,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo release
-        uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        uses: taiki-e/install-action@d4422f254e595ee762a758628fe4f16ce050fa2e # v2
         with:
           tool: cargo-release@0.25.0
       - uses: taiki-e/create-gh-release-action@56a8b3f8449593aa02b91f7b84da564f476e94f0 # v1
@@ -192,7 +192,7 @@ jobs:
         run: |
           brew install b2sum
 
-      - uses: taiki-e/upload-rust-binary-action@3962470d6e7f1993108411bc3f75a135ec67fc8c # v1.27.0
+      - uses: taiki-e/upload-rust-binary-action@f391289bcff6a7f36b6301c0a74199657bbb4561 # v1.28.0
         with:
           bin: cargo-nextest
           # The tag name contains the binary name so just use that.
@@ -346,7 +346,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo release
-        uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        uses: taiki-e/install-action@d4422f254e595ee762a758628fe4f16ce050fa2e # v2
         with:
           tool: cargo-release@0.25.0
       # The GitHub release must be marked as published (immutable) before Mukti
