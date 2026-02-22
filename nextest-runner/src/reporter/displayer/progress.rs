@@ -918,8 +918,9 @@ pub(super) fn progress_bar_msg(
 mod tests {
     use super::*;
     use crate::{
+        output_spec::LiveSpec,
         reporter::TestOutputDisplay,
-        test_output::{ChildExecutionOutput, ChildOutput, ChildSingleOutput, ChildSplitOutput},
+        test_output::{ChildExecutionOutput, ChildOutput, ChildSplitOutput},
     };
     use bytes::Bytes;
     use chrono::Local;
@@ -1345,7 +1346,7 @@ mod tests {
     }
 
     // Helper to create minimal output for ExecuteStatus.
-    fn make_test_output() -> ChildExecutionOutputDescription<ChildSingleOutput> {
+    fn make_test_output() -> ChildExecutionOutputDescription<LiveSpec> {
         ChildExecutionOutput::Output {
             result: Some(ExecutionResult::Pass),
             output: ChildOutput::Split(ChildSplitOutput {

@@ -7,13 +7,17 @@
 //! The types here mirror the runtime types in [`crate::reporter::events`] but are
 //! designed for serialization rather than runtime use.
 //!
-//! The `O` type parameter represents how output is stored:
-//! - [`ChildSingleOutput`]: Output stored in memory with lazy string conversion.
-//! - [`ZipStoreOutput`]: Reference to a file stored in the zip archive.
+//! The `S` type parameter specifies how output is stored (see
+//! [`OutputSpec`](crate::output_spec::OutputSpec)):
+//! - [`LiveSpec`](crate::output_spec::LiveSpec): output stored in memory with
+//!   lazy string conversion.
+//! - [`RecordingSpec`](crate::output_spec::RecordingSpec): reference to a file stored
+//!   in the zip archive.
 
 use crate::{
     config::scripts::ScriptId,
     list::OwnedTestInstanceId,
+    output_spec::{LiveSpec, OutputSpec},
     reporter::{
         TestOutputDisplay,
         events::{
@@ -23,7 +27,6 @@ use crate::{
     },
     run_mode::NextestRunMode,
     runner::StressCondition,
-    test_output::ChildSingleOutput,
 };
 use chrono::{DateTime, FixedOffset};
 use nextest_metadata::MismatchReason;
@@ -61,26 +64,23 @@ impl RecordOpts {
 
 /// A serializable form of a test event.
 ///
-/// The `O` parameter represents how test outputs (stdout/stderr) are stored:
-///
-/// * [`ChildSingleOutput`]: Output stored in memory with lazy string conversion.
-///   This is the first stage after converting from a [`TestEvent`].
-/// * [`ZipStoreOutput`]: Reference to a file in the zip archive. This is the
-///   final form after writing outputs to the store.
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+/// The `S` parameter specifies how test outputs are stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Debug, PartialEq; S::ChildOutput)]
+#[derive(Deserialize, Serialize)]
 #[serde(
     rename_all = "kebab-case",
     bound(
-        serialize = "O: Serialize",
-        deserialize = "O: serde::de::DeserializeOwned"
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
     )
 )]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + PartialEq + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + PartialEq + 'static))
 )]
-pub struct TestEventSummary<O> {
+pub struct TestEventSummary<S: OutputSpec> {
     /// The timestamp of the event.
     #[cfg_attr(
         test,
@@ -93,10 +93,10 @@ pub struct TestEventSummary<O> {
     pub elapsed: Duration,
 
     /// The kind of test event this is.
-    pub kind: TestEventKindSummary<O>,
+    pub kind: TestEventKindSummary<S>,
 }
 
-impl TestEventSummary<ChildSingleOutput> {
+impl TestEventSummary<LiveSpec> {
     /// Converts a [`TestEvent`] to a serializable summary.
     ///
     /// Returns `None` for events that should not be recorded (informational and
@@ -117,24 +117,36 @@ impl TestEventSummary<ChildSingleOutput> {
 /// without output) or an [`OutputEventKind`] (events with output). The split
 /// design allows conversion between output representations to only touch the
 /// output-carrying variants.
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+///
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Debug, PartialEq; S::ChildOutput)]
+#[derive(Deserialize, Serialize)]
+#[serde(
+    tag = "type",
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + PartialEq + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + PartialEq + 'static))
 )]
-pub enum TestEventKindSummary<O> {
+pub enum TestEventKindSummary<S: OutputSpec> {
     /// An event that doesn't carry output.
     Core(CoreEventKind),
     /// An event that carries output.
-    Output(OutputEventKind<O>),
+    Output(OutputEventKind<S>),
 }
 
 /// Events that don't carry test output.
 ///
 /// These events pass through unchanged during conversion between output
-/// representations (e.g., from [`ChildSingleOutput`] to [`ZipStoreOutput`]).
+/// representations (e.g., from [`LiveSpec`] to
+/// [`RecordingSpec`](crate::output_spec::RecordingSpec)).
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 #[cfg_attr(test, derive(test_strategy::Arbitrary))]
@@ -329,15 +341,27 @@ pub struct TestsNotSeenSummary {
 /// Events that carry test output.
 ///
 /// These events require conversion when changing output representations
-/// (e.g., from [`ChildSingleOutput`] to [`ZipStoreOutput`]).
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+/// (e.g., from [`LiveSpec`] to
+/// [`RecordingSpec`](crate::output_spec::RecordingSpec)).
+///
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Debug, PartialEq; S::ChildOutput)]
+#[derive(Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + PartialEq + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + PartialEq + 'static))
 )]
-pub enum OutputEventKind<O> {
+pub enum OutputEventKind<S: OutputSpec> {
     /// A setup script finished.
     #[serde(rename_all = "kebab-case")]
     SetupScriptFinished {
@@ -356,7 +380,7 @@ pub enum OutputEventKind<O> {
         /// Whether output capture was disabled.
         no_capture: bool,
         /// The execution status.
-        run_status: SetupScriptExecuteStatus<O>,
+        run_status: SetupScriptExecuteStatus<S>,
     },
 
     /// A test attempt failed and will be retried.
@@ -367,7 +391,7 @@ pub enum OutputEventKind<O> {
         /// The test instance.
         test_instance: OwnedTestInstanceId,
         /// The execution status.
-        run_status: ExecuteStatus<O>,
+        run_status: ExecuteStatus<S>,
         /// The delay before the next attempt.
         #[cfg_attr(test, strategy(crate::reporter::test_helpers::arb_duration()))]
         delay_before_next_attempt: Duration,
@@ -393,7 +417,7 @@ pub enum OutputEventKind<O> {
         /// Whether to store failure output in JUnit.
         junit_store_failure_output: bool,
         /// The execution statuses.
-        run_statuses: ExecutionStatuses<O>,
+        run_statuses: ExecutionStatuses<S>,
         /// The current run statistics.
         current_stats: RunStats,
         /// The number of tests currently running.
@@ -401,7 +425,7 @@ pub enum OutputEventKind<O> {
     },
 }
 
-impl TestEventKindSummary<ChildSingleOutput> {
+impl TestEventKindSummary<LiveSpec> {
     fn from_test_event_kind(kind: TestEventKind<'_>) -> Option<Self> {
         Some(match kind {
             TestEventKind::RunStarted {
@@ -823,12 +847,13 @@ impl ZipStoreOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output_spec::RecordingSpec;
     use test_strategy::proptest;
 
     #[proptest]
-    fn test_event_summary_roundtrips(value: TestEventSummary<ZipStoreOutput>) {
+    fn test_event_summary_roundtrips(value: TestEventSummary<RecordingSpec>) {
         let json = serde_json::to_string(&value).expect("serialization succeeds");
-        let roundtrip: TestEventSummary<ZipStoreOutput> =
+        let roundtrip: TestEventSummary<RecordingSpec> =
             serde_json::from_str(&json).expect("deserialization succeeds");
         proptest::prop_assert_eq!(value, roundtrip);
     }

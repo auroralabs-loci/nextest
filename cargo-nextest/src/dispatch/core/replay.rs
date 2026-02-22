@@ -17,11 +17,12 @@ use nextest_metadata::NextestExitCode;
 use nextest_runner::{
     errors::{DisplayErrorChain, RecordReadError},
     list::{OwnedTestInstanceId, TestList},
+    output_spec::RecordingSpec,
     pager::PagedOutput,
     record::{
         PortableRecording, RecordReader, RecordedRunInfo, ReplayContext, ReplayHeader,
         ReplayReporterBuilder, RunIdIndex, RunIdOrRecordingSelector, RunStore,
-        STORE_FORMAT_VERSION, StoreReader, TestEventSummary, ZipStoreOutput, records_state_dir,
+        STORE_FORMAT_VERSION, StoreReader, TestEventSummary, records_state_dir,
     },
     reporter::ReporterOutput,
     user_config::{UserConfig, UserConfigExperimental},
@@ -237,7 +238,7 @@ fn exec_replay_from_archive(
 }
 
 type EventIter<'a> =
-    &'a mut dyn Iterator<Item = Result<TestEventSummary<ZipStoreOutput>, RecordReadError>>;
+    &'a mut dyn Iterator<Item = Result<TestEventSummary<RecordingSpec>, RecordReadError>>;
 
 /// Common replay logic shared between store-based and archive-based replay.
 #[expect(clippy::too_many_arguments)]

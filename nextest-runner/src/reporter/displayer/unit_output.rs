@@ -7,6 +7,7 @@ use super::DisplayerKind;
 use crate::{
     errors::DisplayErrorChain,
     indenter::indented,
+    output_spec::LiveSpec,
     reporter::{
         ByteSubslice, TestOutputErrorSlice, UnitErrorDescription,
         events::*,
@@ -129,7 +130,7 @@ impl UnitOutputReporter {
         &self,
         styles: &Styles,
         spec: &ChildOutputSpec,
-        exec_output: &ChildExecutionOutputDescription<ChildSingleOutput>,
+        exec_output: &ChildExecutionOutputDescription<LiveSpec>,
         mut writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
         match exec_output {
@@ -181,7 +182,7 @@ impl UnitOutputReporter {
         &self,
         styles: &Styles,
         spec: &ChildOutputSpec,
-        output: &ChildOutputDescription<ChildSingleOutput>,
+        output: &ChildOutputDescription<LiveSpec>,
         highlight_slice: Option<TestOutputErrorSlice<'_>>,
         mut writer: &mut dyn WriteStr,
     ) -> io::Result<()> {

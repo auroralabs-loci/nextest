@@ -14,10 +14,11 @@ use super::{
         CARGO_METADATA_JSON_PATH, OutputDict, RECORD_OPTS_JSON_PATH, RUN_LOG_FILE_NAME,
         STDERR_DICT_PATH, STDOUT_DICT_PATH, STORE_ZIP_FILE_NAME, TEST_LIST_JSON_PATH,
     },
-    summary::{RecordOpts, TestEventSummary, ZipStoreOutput},
+    summary::{RecordOpts, TestEventSummary},
 };
 use crate::{
     errors::RecordReadError,
+    output_spec::RecordingSpec,
     record::format::{RERUN_INFO_JSON_PATH, RerunInfo},
     user_config::elements::MAX_MAX_OUTPUT_SIZE,
 };
@@ -413,7 +414,7 @@ pub struct RecordEventIter {
 }
 
 impl Iterator for RecordEventIter {
-    type Item = Result<TestEventSummary<ZipStoreOutput>, RecordReadError>;
+    type Item = Result<TestEventSummary<RecordingSpec>, RecordReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

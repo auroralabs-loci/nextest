@@ -21,6 +21,7 @@ use super::{
 };
 use crate::{
     errors::{RunStoreError, StoreWriterError},
+    output_spec::{LiveSpec, RecordingSpec},
     record::format::{RERUN_INFO_JSON_PATH, RerunInfo},
     reporter::events::{
         ChildExecutionOutputDescription, ChildOutputDescription, ExecuteStatus, ExecutionStatuses,
@@ -239,7 +240,7 @@ impl RunRecorder {
     /// (with file references) is written to the JSON Lines log.
     pub(crate) fn write_event(
         &mut self,
-        event: TestEventSummary<ChildSingleOutput>,
+        event: TestEventSummary<LiveSpec>,
     ) -> Result<(), RunStoreError> {
         let mut cx = SerializeTestEventContext {
             store_writer: &mut self.store_writer,
@@ -464,8 +465,8 @@ impl SerializeTestEventContext<'_> {
     /// Converts an in-memory event to a zip store event.
     fn convert_event(
         &mut self,
-        event: TestEventSummary<ChildSingleOutput>,
-    ) -> Result<TestEventSummary<ZipStoreOutput>, StoreWriterError> {
+        event: TestEventSummary<LiveSpec>,
+    ) -> Result<TestEventSummary<RecordingSpec>, StoreWriterError> {
         Ok(TestEventSummary {
             timestamp: event.timestamp,
             elapsed: event.elapsed,
@@ -475,8 +476,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_event_kind(
         &mut self,
-        kind: TestEventKindSummary<ChildSingleOutput>,
-    ) -> Result<TestEventKindSummary<ZipStoreOutput>, StoreWriterError> {
+        kind: TestEventKindSummary<LiveSpec>,
+    ) -> Result<TestEventKindSummary<RecordingSpec>, StoreWriterError> {
         match kind {
             TestEventKindSummary::Core(core) => Ok(TestEventKindSummary::Core(core)),
             TestEventKindSummary::Output(output) => Ok(TestEventKindSummary::Output(
@@ -487,8 +488,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_output_event(
         &mut self,
-        event: OutputEventKind<ChildSingleOutput>,
-    ) -> Result<OutputEventKind<ZipStoreOutput>, StoreWriterError> {
+        event: OutputEventKind<LiveSpec>,
+    ) -> Result<OutputEventKind<RecordingSpec>, StoreWriterError> {
         match event {
             OutputEventKind::SetupScriptFinished {
                 stress_index,
@@ -559,8 +560,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_setup_script_status(
         &mut self,
-        status: &SetupScriptExecuteStatus<ChildSingleOutput>,
-    ) -> Result<SetupScriptExecuteStatus<ZipStoreOutput>, StoreWriterError> {
+        status: &SetupScriptExecuteStatus<LiveSpec>,
+    ) -> Result<SetupScriptExecuteStatus<RecordingSpec>, StoreWriterError> {
         Ok(SetupScriptExecuteStatus {
             output: self.convert_child_execution_output(&status.output)?,
             result: status.result.clone(),
@@ -574,8 +575,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_execution_statuses(
         &mut self,
-        statuses: ExecutionStatuses<ChildSingleOutput>,
-    ) -> Result<ExecutionStatuses<ZipStoreOutput>, StoreWriterError> {
+        statuses: ExecutionStatuses<LiveSpec>,
+    ) -> Result<ExecutionStatuses<RecordingSpec>, StoreWriterError> {
         let statuses = statuses
             .into_iter()
             .map(|status| self.convert_execute_status(status))
@@ -585,8 +586,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_execute_status(
         &mut self,
-        status: ExecuteStatus<ChildSingleOutput>,
-    ) -> Result<ExecuteStatus<ZipStoreOutput>, StoreWriterError> {
+        status: ExecuteStatus<LiveSpec>,
+    ) -> Result<ExecuteStatus<RecordingSpec>, StoreWriterError> {
         let output = self.convert_child_execution_output(&status.output)?;
 
         Ok(ExecuteStatus {
@@ -604,8 +605,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_child_execution_output(
         &mut self,
-        output: &ChildExecutionOutputDescription<ChildSingleOutput>,
-    ) -> Result<ChildExecutionOutputDescription<ZipStoreOutput>, StoreWriterError> {
+        output: &ChildExecutionOutputDescription<LiveSpec>,
+    ) -> Result<ChildExecutionOutputDescription<RecordingSpec>, StoreWriterError> {
         match output {
             ChildExecutionOutputDescription::Output {
                 result,
@@ -627,8 +628,8 @@ impl SerializeTestEventContext<'_> {
 
     fn convert_child_output(
         &mut self,
-        output: &ChildOutputDescription<ChildSingleOutput>,
-    ) -> Result<ChildOutputDescription<ZipStoreOutput>, StoreWriterError> {
+        output: &ChildOutputDescription<LiveSpec>,
+    ) -> Result<ChildOutputDescription<RecordingSpec>, StoreWriterError> {
         match output {
             ChildOutputDescription::Split { stdout, stderr } => Ok(ChildOutputDescription::Split {
                 // Preserve None (not captured) vs Some (captured, possibly empty).

@@ -420,11 +420,11 @@ impl TestEventOutcomes {
 /// This helper exists to make the event processing logic testable without
 /// requiring a full `RecordReader`. It accepts a fallible iterator to enable
 /// streaming without in-memory buffering.
-fn collect_from_events<K, O, E>(
+fn collect_from_events<K, S: crate::output_spec::OutputSpec, E>(
     events: impl Iterator<Item = Result<K, E>>,
 ) -> Result<HashMap<OwnedTestInstanceId, TestOutcome>, E>
 where
-    K: Borrow<TestEventKindSummary<O>>,
+    K: Borrow<TestEventKindSummary<S>>,
 {
     let mut outcomes = HashMap::new();
 
@@ -477,6 +477,7 @@ where
 mod tests {
     use super::*;
     use crate::{
+        output_spec::RecordingSpec,
         record::{OutputEventKind, StressIndexSummary, TestEventKindSummary},
         reporter::{
             TestOutputDisplay,
@@ -1444,13 +1445,13 @@ mod tests {
 
     /// Creates a `TestFinished` event for testing.
     ///
-    /// Uses `()` as the output type since we don't need actual output data for
-    /// these tests.
+    /// Uses `RecordingSpec` as the output spec since we don't need actual output
+    /// data for these tests (all outputs are `None`).
     fn make_test_finished(
         test_instance: OwnedTestInstanceId,
         stress_index: Option<(u32, Option<u32>)>,
         passed: bool,
-    ) -> TestEventKindSummary<()> {
+    ) -> TestEventKindSummary<RecordingSpec> {
         let result = if passed {
             ExecutionResultDescription::Pass
         } else {

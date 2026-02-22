@@ -14,8 +14,9 @@ use crate::{
     },
     errors::{ChildError, ChildFdError, ChildStartError, ErrorList},
     list::{OwnedTestInstanceId, TestInstanceId, TestList},
+    output_spec::{LiveSpec, OutputSpec},
     runner::{StressCondition, StressCount},
-    test_output::{ChildExecutionOutput, ChildOutput, ChildSingleOutput},
+    test_output::{ChildExecutionOutput, ChildOutput},
 };
 use chrono::{DateTime, FixedOffset};
 use nextest_metadata::MismatchReason;
@@ -163,7 +164,7 @@ pub enum TestEventKind<'a> {
         no_capture: bool,
 
         /// The execution status of the setup script.
-        run_status: SetupScriptExecuteStatus<ChildSingleOutput>,
+        run_status: SetupScriptExecuteStatus<LiveSpec>,
     },
 
     // TODO: add events for BinaryStarted and BinaryFinished? May want a slightly different way to
@@ -216,7 +217,7 @@ pub enum TestEventKind<'a> {
         test_instance: TestInstanceId<'a>,
 
         /// The status of this attempt to run the test. Will never be success.
-        run_status: ExecuteStatus<ChildSingleOutput>,
+        run_status: ExecuteStatus<LiveSpec>,
 
         /// The delay before the next attempt to run the test.
         delay_before_next_attempt: Duration,
@@ -267,7 +268,7 @@ pub enum TestEventKind<'a> {
         junit_store_failure_output: bool,
 
         /// Information about all the runs for this test.
-        run_statuses: ExecutionStatuses<ChildSingleOutput>,
+        run_statuses: ExecutionStatuses<LiveSpec>,
 
         /// Current statistics for number of tests so far.
         current_stats: RunStats,
@@ -675,10 +676,7 @@ impl RunStats {
         }
     }
 
-    pub(crate) fn on_setup_script_finished(
-        &mut self,
-        status: &SetupScriptExecuteStatus<ChildSingleOutput>,
-    ) {
+    pub(crate) fn on_setup_script_finished(&mut self, status: &SetupScriptExecuteStatus<LiveSpec>) {
         self.setup_scripts_finished_count += 1;
 
         match status.result {
@@ -704,7 +702,7 @@ impl RunStats {
         }
     }
 
-    pub(crate) fn on_test_finished(&mut self, run_statuses: &ExecutionStatuses<ChildSingleOutput>) {
+    pub(crate) fn on_test_finished(&mut self, run_statuses: &ExecutionStatuses<LiveSpec>) {
         self.finished_count += 1;
         // run_statuses is guaranteed to have at least one element.
         // * If the last element is success, treat it as success (and possibly flaky).
@@ -870,30 +868,42 @@ pub enum RunStatsFailureKind {
 
 /// Information about executions of a test, including retries.
 ///
-/// The type parameter `O` represents how test output is stored.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Clone, Debug, PartialEq, Eq; S::ChildOutput)]
+#[derive(Serialize)]
+#[serde(
+    rename_all = "kebab-case",
+    bound(serialize = "S::ChildOutput: Serialize")
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
 )]
-pub struct ExecutionStatuses<O> {
+pub struct ExecutionStatuses<S: OutputSpec> {
     /// This is guaranteed to be non-empty.
-    #[cfg_attr(test, strategy(proptest::collection::vec(proptest::arbitrary::any::<ExecuteStatus<O>>(), 1..=3)))]
-    statuses: Vec<ExecuteStatus<O>>,
+    #[cfg_attr(test, strategy(proptest::collection::vec(proptest::arbitrary::any::<ExecuteStatus<S>>(), 1..=3)))]
+    statuses: Vec<ExecuteStatus<S>>,
 }
 
-impl<'de, O: Deserialize<'de>> Deserialize<'de> for ExecutionStatuses<O> {
+impl<'de, S: OutputSpec> Deserialize<'de> for ExecutionStatuses<S>
+where
+    S::ChildOutput: serde::de::DeserializeOwned,
+{
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         // Deserialize as the wrapper struct that matches the Serialize output.
+        // S is already bound as OutputSpec on this impl.
         #[derive(Deserialize)]
-        #[serde(rename_all = "kebab-case")]
-        struct Helper<O> {
-            statuses: Vec<ExecuteStatus<O>>,
+        #[serde(
+            rename_all = "kebab-case",
+            bound(deserialize = "S::ChildOutput: serde::de::DeserializeOwned")
+        )]
+        struct Helper<S: OutputSpec> {
+            statuses: Vec<ExecuteStatus<S>>,
         }
 
-        let helper = Helper::<O>::deserialize(deserializer)?;
+        let helper = Helper::<S>::deserialize(deserializer)?;
         if helper.statuses.is_empty() {
             return Err(serde::de::Error::custom("expected non-empty statuses"));
         }
@@ -904,8 +914,8 @@ impl<'de, O: Deserialize<'de>> Deserialize<'de> for ExecutionStatuses<O> {
 }
 
 #[expect(clippy::len_without_is_empty)] // RunStatuses is never empty
-impl<O> ExecutionStatuses<O> {
-    pub(crate) fn new(statuses: Vec<ExecuteStatus<O>>) -> Self {
+impl<S: OutputSpec> ExecutionStatuses<S> {
+    pub(crate) fn new(statuses: Vec<ExecuteStatus<S>>) -> Self {
         debug_assert!(!statuses.is_empty(), "ExecutionStatuses must be non-empty");
         Self { statuses }
     }
@@ -913,14 +923,14 @@ impl<O> ExecutionStatuses<O> {
     /// Returns the last execution status.
     ///
     /// This status is typically used as the final result.
-    pub fn last_status(&self) -> &ExecuteStatus<O> {
+    pub fn last_status(&self) -> &ExecuteStatus<S> {
         self.statuses
             .last()
             .expect("execution statuses is non-empty")
     }
 
     /// Iterates over all the statuses.
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &'_ ExecuteStatus<O>> + '_ {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &'_ ExecuteStatus<S>> + '_ {
         self.statuses.iter()
     }
 
@@ -930,7 +940,7 @@ impl<O> ExecutionStatuses<O> {
     }
 
     /// Returns a description of self.
-    pub fn describe(&self) -> ExecutionDescription<'_, O> {
+    pub fn describe(&self) -> ExecutionDescription<'_, S> {
         let last_status = self.last_status();
         if last_status.result.is_success() {
             if self.statuses.len() > 1 {
@@ -958,9 +968,9 @@ impl<O> ExecutionStatuses<O> {
     }
 }
 
-impl<O> IntoIterator for ExecutionStatuses<O> {
-    type Item = ExecuteStatus<O>;
-    type IntoIter = std::vec::IntoIter<ExecuteStatus<O>>;
+impl<S: OutputSpec> IntoIterator for ExecutionStatuses<S> {
+    type Item = ExecuteStatus<S>;
+    type IntoIter = std::vec::IntoIter<ExecuteStatus<S>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.statuses.into_iter()
@@ -968,56 +978,57 @@ impl<O> IntoIterator for ExecutionStatuses<O> {
 }
 
 // TODO: Add Arbitrary impl for ExecutionStatuses when generic type support is added.
-// This requires ExecuteStatus<O> to implement Arbitrary with proper bounds.
+// This requires ExecuteStatus<S> to implement Arbitrary with proper bounds.
 
 /// A description of test executions obtained from `ExecuteStatuses`.
 ///
 /// This can be used to quickly determine whether a test passed, failed or was flaky.
 ///
-/// The type parameter `O` represents how test output is stored.
-#[derive(Debug)]
-pub enum ExecutionDescription<'a, O> {
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Debug; S::ChildOutput)]
+pub enum ExecutionDescription<'a, S: OutputSpec> {
     /// The test was run once and was successful.
     Success {
         /// The status of the test.
-        single_status: &'a ExecuteStatus<O>,
+        single_status: &'a ExecuteStatus<S>,
     },
 
     /// The test was run more than once. The final result was successful.
     Flaky {
         /// The last, successful status.
-        last_status: &'a ExecuteStatus<O>,
+        last_status: &'a ExecuteStatus<S>,
 
         /// Previous statuses, none of which are successes.
-        prior_statuses: &'a [ExecuteStatus<O>],
+        prior_statuses: &'a [ExecuteStatus<S>],
     },
 
     /// The test was run once, or possibly multiple times. All runs failed.
     Failure {
         /// The first, failing status.
-        first_status: &'a ExecuteStatus<O>,
+        first_status: &'a ExecuteStatus<S>,
 
         /// The last, failing status. Same as the first status if no retries were performed.
-        last_status: &'a ExecuteStatus<O>,
+        last_status: &'a ExecuteStatus<S>,
 
         /// Any retries that were performed. All of these runs failed.
         ///
         /// May be empty.
-        retries: &'a [ExecuteStatus<O>],
+        retries: &'a [ExecuteStatus<S>],
     },
 }
 
-// Manual Copy and Clone implementations to avoid requiring O: Copy/Clone, since
-// ExecutionDescription just stores references.
-impl<O> Clone for ExecutionDescription<'_, O> {
+// Manual Copy and Clone implementations to avoid requiring S::ChildOutput:
+// Copy/Clone, since ExecutionDescription only stores references.
+impl<S: OutputSpec> Clone for ExecutionDescription<'_, S> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<O> Copy for ExecutionDescription<'_, O> {}
+impl<S: OutputSpec> Copy for ExecutionDescription<'_, S> {}
 
-impl<'a, O> ExecutionDescription<'a, O> {
+impl<'a, S: OutputSpec> ExecutionDescription<'a, S> {
     /// Returns the status level for this `ExecutionDescription`.
     pub fn status_level(&self) -> StatusLevel {
         match self {
@@ -1071,7 +1082,7 @@ impl<'a, O> ExecutionDescription<'a, O> {
     }
 
     /// Returns the last run status.
-    pub fn last_status(&self) -> &'a ExecuteStatus<O> {
+    pub fn last_status(&self) -> &'a ExecuteStatus<S> {
         match self {
             ExecutionDescription::Success {
                 single_status: last_status,
@@ -1119,21 +1130,27 @@ pub struct OutputErrorSlice {
 /// [`ExecutionResultDescription`], a platform-independent type that can be
 /// serialized and deserialized across platforms.
 ///
-/// The type parameter `O` represents how test output is stored:
-/// - [`ChildSingleOutput`]: Output stored in memory with lazy string conversion.
-/// - Other types may be used for serialization to archives.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Clone, Debug, PartialEq, Eq; S::ChildOutput)]
+#[derive(Serialize, Deserialize)]
+#[serde(
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
 )]
-pub struct ExecuteStatus<O> {
+pub struct ExecuteStatus<S: OutputSpec> {
     /// Retry-related data.
     pub retry_data: RetryData,
     /// The stdout and stderr output for this test.
-    pub output: ChildExecutionOutputDescription<O>,
+    pub output: ChildExecutionOutputDescription<S>,
     /// The execution result for this test: pass, fail or execution error.
     pub result: ExecutionResultDescription,
     /// The time at which the test started.
@@ -1168,17 +1185,25 @@ pub struct ExecuteStatus<O> {
 /// [`ExecutionResultDescription`], a platform-independent type that can be
 /// serialized and deserialized across platforms.
 ///
-/// The type parameter `O` represents how test output is stored.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Clone, Debug, PartialEq, Eq; S::ChildOutput)]
+#[derive(Serialize, Deserialize)]
+#[serde(
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
 )]
-pub struct SetupScriptExecuteStatus<O> {
+pub struct SetupScriptExecuteStatus<S: OutputSpec> {
     /// Output for this setup script.
-    pub output: ChildExecutionOutputDescription<O>,
+    pub output: ChildExecutionOutputDescription<S>,
 
     /// The execution result for this setup script: pass, fail or execution error.
     pub result: ExecutionResultDescription,
@@ -1228,20 +1253,23 @@ pub struct SetupScriptEnvMap {
 /// The result of executing a child process, generic over output storage.
 ///
 /// This is the external-facing counterpart to [`ChildExecutionOutput`]. The
-/// type parameter `O` represents how output is stored:
-///
-/// - [`ChildSingleOutput`]: Output stored in memory with lazy string caching.
-///   Used by reporter event types during live runs.
-/// - [`ZipStoreOutput`](crate::record::ZipStoreOutput): Reference to a file in
-///   a zip archive. Used for record/replay serialization.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+/// type parameter `S` specifies how output is stored (see [`OutputSpec`]).
+#[derive_where::derive_where(Clone, Debug, PartialEq, Eq; S::ChildOutput)]
+#[derive(Serialize, Deserialize)]
+#[serde(
+    tag = "type",
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
 )]
-pub enum ChildExecutionOutputDescription<O> {
+pub enum ChildExecutionOutputDescription<S: OutputSpec> {
     /// The process was run and the output was captured.
     Output {
         /// If the process has finished executing, the final state it is in.
@@ -1250,7 +1278,7 @@ pub enum ChildExecutionOutputDescription<O> {
         result: Option<ExecutionResultDescription>,
 
         /// The captured output.
-        output: ChildOutputDescription<O>,
+        output: ChildOutputDescription<S>,
 
         /// Errors that occurred while waiting on the child process or parsing
         /// its output.
@@ -1261,7 +1289,7 @@ pub enum ChildExecutionOutputDescription<O> {
     StartError(ChildStartErrorDescription),
 }
 
-impl<O> ChildExecutionOutputDescription<O> {
+impl<S: OutputSpec> ChildExecutionOutputDescription<S> {
     /// Returns true if there are any errors in this output.
     pub fn has_errors(&self) -> bool {
         match self {
@@ -1284,30 +1312,41 @@ impl<O> ChildExecutionOutputDescription<O> {
 /// This represents either split stdout/stderr or combined output. The `Option`
 /// wrappers distinguish between "not captured" (`None`) and "captured but
 /// empty" (`Some` with empty content).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+///
+/// The type parameter `S` specifies how test output is stored (see
+/// [`OutputSpec`]).
+#[derive_where::derive_where(Clone, Debug, PartialEq, Eq; S::ChildOutput)]
+#[derive(Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    bound(
+        serialize = "S::ChildOutput: Serialize",
+        deserialize = "S::ChildOutput: serde::de::DeserializeOwned"
+    )
+)]
 #[cfg_attr(
     test,
     derive(test_strategy::Arbitrary),
-    arbitrary(bound(O: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
+    arbitrary(bound(S: 'static, S::ChildOutput: proptest::arbitrary::Arbitrary + std::fmt::Debug + 'static))
 )]
-pub enum ChildOutputDescription<O> {
+pub enum ChildOutputDescription<S: OutputSpec> {
     /// The output was split into stdout and stderr.
     Split {
         /// Standard output, or `None` if not captured.
-        stdout: Option<O>,
+        stdout: Option<S::ChildOutput>,
         /// Standard error, or `None` if not captured.
-        stderr: Option<O>,
+        stderr: Option<S::ChildOutput>,
     },
 
     /// The output was combined into a single stream.
     Combined {
         /// The combined output.
-        output: O,
+        output: S::ChildOutput,
     },
 }
 
-impl ChildOutputDescription<ChildSingleOutput> {
+impl ChildOutputDescription<LiveSpec> {
     /// Returns the lengths of stdout and stderr in bytes.
     ///
     /// Returns `None` for each stream that wasn't captured.
@@ -1446,7 +1485,7 @@ impl fmt::Display for IoErrorDescription {
 
 impl std::error::Error for IoErrorDescription {}
 
-impl From<ChildExecutionOutput> for ChildExecutionOutputDescription<ChildSingleOutput> {
+impl From<ChildExecutionOutput> for ChildExecutionOutputDescription<LiveSpec> {
     fn from(output: ChildExecutionOutput) -> Self {
         match output {
             ChildExecutionOutput::Output {
@@ -1465,7 +1504,7 @@ impl From<ChildExecutionOutput> for ChildExecutionOutputDescription<ChildSingleO
     }
 }
 
-impl From<ChildOutput> for ChildOutputDescription<ChildSingleOutput> {
+impl From<ChildOutput> for ChildOutputDescription<LiveSpec> {
     fn from(output: ChildOutput) -> Self {
         match output {
             ChildOutput::Split(split) => Self::Split {
@@ -2050,7 +2089,7 @@ pub struct SetupScriptInfoResponse {
     pub state: UnitState,
 
     /// Output obtained from the setup script.
-    pub output: ChildExecutionOutputDescription<ChildSingleOutput>,
+    pub output: ChildExecutionOutputDescription<LiveSpec>,
 }
 
 /// A test's response to an information request.
@@ -2069,7 +2108,7 @@ pub struct TestInfoResponse<'a> {
     pub state: UnitState,
 
     /// Output obtained from the test.
-    pub output: ChildExecutionOutputDescription<ChildSingleOutput>,
+    pub output: ChildExecutionOutputDescription<LiveSpec>,
 }
 
 /// The current state of a test or script process: running, exiting, or
