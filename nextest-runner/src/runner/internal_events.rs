@@ -12,6 +12,7 @@ use crate::{
     config::scripts::{ScriptId, SetupScriptConfig},
     errors::DisplayErrorChain,
     list::TestInstance,
+    output_spec::LiveSpec,
     reporter::{
         TestOutputDisplay, UnitErrorDescription,
         events::{
@@ -21,7 +22,7 @@ use crate::{
         },
     },
     signal::ShutdownEvent,
-    test_output::{ChildExecutionOutput, ChildSingleOutput},
+    test_output::ChildExecutionOutput,
     time::StopwatchSnapshot,
 };
 use nextest_metadata::MismatchReason;
@@ -66,7 +67,7 @@ pub(super) enum ExecutorEvent<'a> {
         program: String,
         index: usize,
         total: usize,
-        status: SetupScriptExecuteStatus<ChildSingleOutput>,
+        status: SetupScriptExecuteStatus<LiveSpec>,
     },
     Started {
         stress_index: Option<StressIndex>,
@@ -95,7 +96,7 @@ pub(super) enum ExecutorEvent<'a> {
         stress_index: Option<StressIndex>,
         test_instance: TestInstance<'a>,
         failure_output: TestOutputDisplay,
-        run_status: ExecuteStatus<ChildSingleOutput>,
+        run_status: ExecuteStatus<LiveSpec>,
         delay_before_next_attempt: Duration,
     },
     RetryStarted {
@@ -113,7 +114,7 @@ pub(super) enum ExecutorEvent<'a> {
         failure_output: TestOutputDisplay,
         junit_store_success_output: bool,
         junit_store_failure_output: bool,
-        last_run_status: ExecuteStatus<ChildSingleOutput>,
+        last_run_status: ExecuteStatus<LiveSpec>,
     },
     Skipped {
         stress_index: Option<StressIndex>,
@@ -160,8 +161,8 @@ pub(super) struct InternalExecuteStatus<'a> {
 }
 
 impl InternalExecuteStatus<'_> {
-    pub(super) fn into_external(self) -> ExecuteStatus<ChildSingleOutput> {
-        let output: ChildExecutionOutputDescription<ChildSingleOutput> = self.output.into();
+    pub(super) fn into_external(self) -> ExecuteStatus<LiveSpec> {
+        let output: ChildExecutionOutputDescription<LiveSpec> = self.output.into();
 
         // Compute the error summary and output error slice using
         // UnitErrorDescription.
@@ -199,8 +200,8 @@ pub(super) struct InternalSetupScriptExecuteStatus<'a> {
 }
 
 impl InternalSetupScriptExecuteStatus<'_> {
-    pub(super) fn into_external(self) -> SetupScriptExecuteStatus<ChildSingleOutput> {
-        let output: ChildExecutionOutputDescription<ChildSingleOutput> = self.output.into();
+    pub(super) fn into_external(self) -> SetupScriptExecuteStatus<LiveSpec> {
+        let output: ChildExecutionOutputDescription<LiveSpec> = self.output.into();
 
         // Compute the error summary using UnitErrorDescription.
         // Setup scripts don't have output_error_slice since that's only for

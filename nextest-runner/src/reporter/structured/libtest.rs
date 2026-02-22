@@ -26,6 +26,7 @@ use crate::{
     config::elements::{LeakTimeoutResult, SlowTimeoutResult},
     errors::{DisplayErrorChain, FormatVersionError, FormatVersionErrorInner, WriteEventError},
     list::{RustTestSuite, TestList},
+    output_spec::LiveSpec,
     reporter::events::{
         ChildExecutionOutputDescription, ChildOutputDescription, ExecutionResultDescription,
         StressIndex, TestEvent, TestEventKind,
@@ -586,7 +587,7 @@ impl<'cfg> LibtestReporter<'cfg> {
 /// This function relies on the fact that nextest runs every individual test in
 /// isolation.
 fn strip_human_output_from_failed_test(
-    output: &ChildExecutionOutputDescription<ChildSingleOutput>,
+    output: &ChildExecutionOutputDescription<LiveSpec>,
     out: &mut bytes::BytesMut,
     test_name: &TestCaseName,
 ) -> Result<(), WriteEventError> {

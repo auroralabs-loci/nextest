@@ -31,6 +31,7 @@ use crate::{
     },
     indenter::indented,
     list::TestInstanceId,
+    output_spec::LiveSpec,
     record::{ReplayHeader, ShortestRunIdPrefix},
     reporter::{
         displayer::{
@@ -43,7 +44,6 @@ use crate::{
     },
     run_mode::NextestRunMode,
     runner::StressCount,
-    test_output::ChildSingleOutput,
     write_str::WriteStr,
 };
 use debug_ignore::DebugIgnore;
@@ -383,7 +383,7 @@ impl ReporterOutputImpl<'_> {
 enum FinalOutput {
     Skipped(#[expect(dead_code)] MismatchReason),
     Executed {
-        run_statuses: ExecutionStatuses<ChildSingleOutput>,
+        run_statuses: ExecutionStatuses<LiveSpec>,
         display_output: bool,
     },
 }
@@ -1452,7 +1452,7 @@ impl<'a> DisplayReporterImpl<'a> {
         script_id: &ScriptId,
         command: &str,
         args: &[String],
-        status: &SetupScriptExecuteStatus<ChildSingleOutput>,
+        status: &SetupScriptExecuteStatus<LiveSpec>,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
         match status.result {
@@ -1492,7 +1492,7 @@ impl<'a> DisplayReporterImpl<'a> {
         stress_index: Option<StressIndex>,
         counter: TestInstanceCounter,
         test_instance: TestInstanceId<'a>,
-        describe: ExecutionDescription<'_, ChildSingleOutput>,
+        describe: ExecutionDescription<'_, LiveSpec>,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
         self.write_status_line_impl(
@@ -1510,7 +1510,7 @@ impl<'a> DisplayReporterImpl<'a> {
         stress_index: Option<StressIndex>,
         counter: TestInstanceCounter,
         test_instance: TestInstanceId<'a>,
-        describe: ExecutionDescription<'_, ChildSingleOutput>,
+        describe: ExecutionDescription<'_, LiveSpec>,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
         self.write_status_line_impl(
@@ -1528,7 +1528,7 @@ impl<'a> DisplayReporterImpl<'a> {
         stress_index: Option<StressIndex>,
         counter: TestInstanceCounter,
         test_instance: TestInstanceId<'a>,
-        describe: ExecutionDescription<'_, ChildSingleOutput>,
+        describe: ExecutionDescription<'_, LiveSpec>,
         kind: StatusLineKind,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
@@ -1559,7 +1559,7 @@ impl<'a> DisplayReporterImpl<'a> {
 
     fn write_status_line_prefix(
         &self,
-        describe: ExecutionDescription<'_, ChildSingleOutput>,
+        describe: ExecutionDescription<'_, LiveSpec>,
         kind: StatusLineKind,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
@@ -2181,7 +2181,7 @@ impl<'a> DisplayReporterImpl<'a> {
 
     fn write_setup_script_execute_status(
         &self,
-        run_status: &SetupScriptExecuteStatus<ChildSingleOutput>,
+        run_status: &SetupScriptExecuteStatus<LiveSpec>,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
         let spec = self.output_spec_for_finished(&run_status.result, false);
@@ -2207,7 +2207,7 @@ impl<'a> DisplayReporterImpl<'a> {
 
     fn write_test_execute_status(
         &self,
-        run_status: &ExecuteStatus<ChildSingleOutput>,
+        run_status: &ExecuteStatus<LiveSpec>,
         is_retry: bool,
         writer: &mut dyn WriteStr,
     ) -> io::Result<()> {
@@ -2578,7 +2578,7 @@ mod tests {
                 UnitTerminateReason,
             },
         },
-        test_output::{ChildExecutionOutput, ChildOutput, ChildSingleOutput, ChildSplitOutput},
+        test_output::{ChildExecutionOutput, ChildOutput, ChildSplitOutput},
     };
     use bytes::Bytes;
     use chrono::Local;
@@ -3188,7 +3188,7 @@ mod tests {
 
         // Collect all test cases: (label, description).
         // The label helps identify each case in the snapshot.
-        let test_cases: Vec<(&str, ExecutionDescription<'_, ChildSingleOutput>)> = vec![
+        let test_cases: Vec<(&str, ExecutionDescription<'_, LiveSpec>)> = vec![
             // Success variants (is_slow = false).
             ("pass", pass_describe),
             ("leak pass", leak_pass_describe),
@@ -3854,7 +3854,7 @@ mod tests {
         result: Option<ExecutionResult>,
         stdout: &str,
         stderr: &str,
-    ) -> ChildExecutionOutputDescription<ChildSingleOutput> {
+    ) -> ChildExecutionOutputDescription<LiveSpec> {
         ChildExecutionOutput::Output {
             result,
             output: ChildOutput::Split(ChildSplitOutput {
@@ -3871,7 +3871,7 @@ mod tests {
         stdout: &str,
         stderr: &str,
         errors: Vec<ChildError>,
-    ) -> ChildExecutionOutputDescription<ChildSingleOutput> {
+    ) -> ChildExecutionOutputDescription<LiveSpec> {
         ChildExecutionOutput::Output {
             result,
             output: ChildOutput::Split(ChildSplitOutput {
@@ -3887,7 +3887,7 @@ mod tests {
         result: Option<ExecutionResult>,
         output: &str,
         errors: Vec<ChildError>,
-    ) -> ChildExecutionOutputDescription<ChildSingleOutput> {
+    ) -> ChildExecutionOutputDescription<LiveSpec> {
         ChildExecutionOutput::Output {
             result,
             output: ChildOutput::Combined {

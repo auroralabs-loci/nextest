@@ -10,6 +10,7 @@
 use crate::{
     errors::RecordReadError,
     list::{OwnedTestInstanceId, TestInstanceId, TestList},
+    output_spec::{LiveSpec, RecordingSpec},
     record::{
         CoreEventKind, OutputEventKind, OutputFileName, StoreReader, StressConditionSummary,
         StressIndexSummary, TestEventKindSummary, TestEventSummary, ZipStoreOutput,
@@ -87,7 +88,7 @@ impl<'a> ReplayContext<'a> {
     /// reference tests that weren't registered).
     pub fn convert_event<'cx>(
         &'cx self,
-        summary: &TestEventSummary<ZipStoreOutput>,
+        summary: &TestEventSummary<RecordingSpec>,
         reader: &mut dyn StoreReader,
     ) -> Result<TestEvent<'cx>, ReplayConversionError> {
         let kind = self.convert_event_kind(&summary.kind, reader)?;
@@ -100,7 +101,7 @@ impl<'a> ReplayContext<'a> {
 
     fn convert_event_kind<'cx>(
         &'cx self,
-        kind: &TestEventKindSummary<ZipStoreOutput>,
+        kind: &TestEventKindSummary<RecordingSpec>,
         reader: &mut dyn StoreReader,
     ) -> Result<TestEventKind<'cx>, ReplayConversionError> {
         match kind {
@@ -320,7 +321,7 @@ impl<'a> ReplayContext<'a> {
 
     fn convert_output_event<'cx>(
         &'cx self,
-        kind: &OutputEventKind<ZipStoreOutput>,
+        kind: &OutputEventKind<RecordingSpec>,
         reader: &mut dyn StoreReader,
     ) -> Result<TestEventKind<'cx>, ReplayConversionError> {
         match kind {
@@ -454,9 +455,9 @@ fn convert_stress_index(summary: &StressIndexSummary) -> StressIndex {
 }
 
 fn convert_execute_status(
-    status: &ExecuteStatus<ZipStoreOutput>,
+    status: &ExecuteStatus<RecordingSpec>,
     reader: &mut dyn StoreReader,
-) -> Result<ExecuteStatus<ChildSingleOutput>, ReplayConversionError> {
+) -> Result<ExecuteStatus<LiveSpec>, ReplayConversionError> {
     let output = convert_child_execution_output(&status.output, reader)?;
     Ok(ExecuteStatus {
         retry_data: status.retry_data,
@@ -472,10 +473,10 @@ fn convert_execute_status(
 }
 
 fn convert_execution_statuses(
-    statuses: &ExecutionStatuses<ZipStoreOutput>,
+    statuses: &ExecutionStatuses<RecordingSpec>,
     reader: &mut dyn StoreReader,
-) -> Result<ExecutionStatuses<ChildSingleOutput>, ReplayConversionError> {
-    let statuses: Vec<ExecuteStatus<ChildSingleOutput>> = statuses
+) -> Result<ExecutionStatuses<LiveSpec>, ReplayConversionError> {
+    let statuses: Vec<ExecuteStatus<LiveSpec>> = statuses
         .iter()
         .map(|s| convert_execute_status(s, reader))
         .collect::<Result<_, _>>()?;
@@ -484,9 +485,9 @@ fn convert_execution_statuses(
 }
 
 fn convert_setup_script_status(
-    status: &SetupScriptExecuteStatus<ZipStoreOutput>,
+    status: &SetupScriptExecuteStatus<RecordingSpec>,
     reader: &mut dyn StoreReader,
-) -> Result<SetupScriptExecuteStatus<ChildSingleOutput>, ReplayConversionError> {
+) -> Result<SetupScriptExecuteStatus<LiveSpec>, ReplayConversionError> {
     let output = convert_child_execution_output(&status.output, reader)?;
     Ok(SetupScriptExecuteStatus {
         output,
@@ -500,9 +501,9 @@ fn convert_setup_script_status(
 }
 
 fn convert_child_execution_output(
-    output: &ChildExecutionOutputDescription<ZipStoreOutput>,
+    output: &ChildExecutionOutputDescription<RecordingSpec>,
     reader: &mut dyn StoreReader,
-) -> Result<ChildExecutionOutputDescription<ChildSingleOutput>, ReplayConversionError> {
+) -> Result<ChildExecutionOutputDescription<LiveSpec>, ReplayConversionError> {
     match output {
         ChildExecutionOutputDescription::Output {
             result,
@@ -523,9 +524,9 @@ fn convert_child_execution_output(
 }
 
 fn convert_child_output(
-    output: &ChildOutputDescription<ZipStoreOutput>,
+    output: &ChildOutputDescription<RecordingSpec>,
     reader: &mut dyn StoreReader,
-) -> Result<ChildOutputDescription<ChildSingleOutput>, ReplayConversionError> {
+) -> Result<ChildOutputDescription<LiveSpec>, ReplayConversionError> {
     match output {
         ChildOutputDescription::Split { stdout, stderr } => {
             let stdout = stdout
