@@ -5,9 +5,9 @@
 
 use crate::{
     errors::RecordReporterError,
+    output_spec::LiveSpec,
     record::{RecordOpts, RunRecorder, StoreSizes, TestEventSummary},
     reporter::events::TestEvent,
-    test_output::ChildSingleOutput,
 };
 use nextest_metadata::TestListSummary;
 use std::{
@@ -165,5 +165,5 @@ enum RecordEvent {
         opts: RecordOpts,
     },
     /// A test event.
-    TestEvent(TestEventSummary<ChildSingleOutput>),
+    TestEvent(TestEventSummary<LiveSpec>),
 }

@@ -27,10 +27,11 @@ use super::{
     },
     reader::{StoreReader, decompress_with_dict},
     store::{RecordedRunInfo, RunFilesExist, StoreRunsDir},
-    summary::{RecordOpts, TestEventSummary, ZipStoreOutput},
+    summary::{RecordOpts, TestEventSummary},
 };
 use crate::{
     errors::{PortableRecordingError, PortableRecordingReadError, RecordReadError},
+    output_spec::RecordingSpec,
     user_config::elements::MAX_MAX_OUTPUT_SIZE,
 };
 use atomicwrites::{AtomicFile, OverwriteBehavior};
@@ -748,7 +749,7 @@ pub struct PortableRecordingEventIter<'a> {
 }
 
 impl Iterator for PortableRecordingEventIter<'_> {
-    type Item = Result<TestEventSummary<ZipStoreOutput>, RecordReadError>;
+    type Item = Result<TestEventSummary<RecordingSpec>, RecordReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

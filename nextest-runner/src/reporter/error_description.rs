@@ -6,7 +6,7 @@ use super::events::{
     ChildOutputDescription, ChildStartErrorDescription, ExecutionResultDescription,
     FailureDescription, UnitKind,
 };
-use crate::{errors::ErrorList, test_output::ChildSingleOutput};
+use crate::{errors::ErrorList, output_spec::LiveSpec};
 use bstr::ByteSlice;
 use regex::bytes::{Regex, RegexBuilder};
 use std::{fmt, sync::LazyLock};
@@ -25,10 +25,7 @@ pub struct UnitErrorDescription<'a> {
 
 impl<'a> UnitErrorDescription<'a> {
     /// Adds the execution output of a child process to the description.
-    pub fn new(
-        kind: UnitKind,
-        output: &'a ChildExecutionOutputDescription<ChildSingleOutput>,
-    ) -> Self {
+    pub fn new(kind: UnitKind, output: &'a ChildExecutionOutputDescription<LiveSpec>) -> Self {
         let mut start_error = None;
         let mut output_errors = None;
         let mut abort = None;

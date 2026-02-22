@@ -10,6 +10,7 @@ use crate::{
     },
     errors::{DisplayErrorChain, WriteEventError},
     list::TestInstanceId,
+    output_spec::LiveSpec,
     reporter::{
         UnitErrorDescription,
         displayer::DisplayUnitKind,
@@ -20,7 +21,6 @@ use crate::{
         },
     },
     run_mode::NextestRunMode,
-    test_output::ChildSingleOutput,
 };
 use debug_ignore::DebugIgnore;
 use indexmap::IndexMap;
@@ -455,7 +455,7 @@ impl TestcaseOrRerun<'_> {
 }
 
 fn set_execute_status_props(
-    exec_output: &ChildExecutionOutputDescription<ChildSingleOutput>,
+    exec_output: &ChildExecutionOutputDescription<LiveSpec>,
     store_stdout_stderr: bool,
     mut out: TestcaseOrRerun<'_>,
 ) {
@@ -772,7 +772,7 @@ mod tests {
     struct ExecuteStatusPropsCase<'a> {
         comment: &'a str,
         status: TestCaseStatus,
-        output: ChildExecutionOutputDescription<ChildSingleOutput>,
+        output: ChildExecutionOutputDescription<LiveSpec>,
         store_stdout_stderr: bool,
         message: Option<&'a str>,
         description: Option<&'a str>,
