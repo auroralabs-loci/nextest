@@ -9,11 +9,26 @@ toc_depth: 1
 This page documents new features and bugfixes for cargo-nextest. Please see the [stability
 policy](https://nexte.st/docs/stability/) for how versioning works with cargo-nextest.
 
-## Unreleased
+## [0.9.129] - 2026-02-22
 
 ### Changed
 
-- `--show-progress=only` now behaves like the default `auto` in non-interactive mode, showing successful tests with a counter. `only` is primarily intended for interactive scenarios.
+- `--show-progress=only` now behaves like the default `auto` in non-interactive mode, showing successful tests with a counter. This change was made because `only` is primarily intended for interactive scenarios. ([#3087])
+- The MSRV for building nextest has been updated to Rust 1.91.
+
+### Fixed
+
+- [Setup scripts](https://nexte.st/docs/configuration/setup-scripts/) that write `NEXTEST`-prefixed environment variables to `$NEXTEST_ENV` now properly report failure. Previously, the setup script would be reported as successful despite invalid variables, and tests would still run. ([#3094])
+
+### Internal improvements
+
+- [Replay output](https://nexte.st/docs/features/record-replay-rerun/) is now only loaded from the archive when needed. This makes replays around 10-15% faster. ([#3090])
+- Switched from the `zip` crate to `eazip` to address repeated semver breakage in the `zip` crate. ([#3093])
+
+[#3087]: https://github.com/nextest-rs/nextest/pull/3087
+[#3090]: https://github.com/nextest-rs/nextest/pull/3090
+[#3093]: https://github.com/nextest-rs/nextest/pull/3093
+[#3094]: https://github.com/nextest-rs/nextest/pull/3094
 
 ## [0.9.128] - 2026-02-19
 
@@ -1967,6 +1982,7 @@ Supported in this initial release:
 - [Test retries](https://nexte.st/book/retries.md) and flaky test detection
 - [JUnit support](https://nexte.st/book/junit.md) for integration with other test tooling
 
+[0.9.129]: https://github.com/nextest-rs/nextest/releases/tag/cargo-nextest-0.9.129
 [0.9.128]: https://github.com/nextest-rs/nextest/releases/tag/cargo-nextest-0.9.128
 [0.9.127]: https://github.com/nextest-rs/nextest/releases/tag/cargo-nextest-0.9.127
 [0.9.126]: https://github.com/nextest-rs/nextest/releases/tag/cargo-nextest-0.9.126
